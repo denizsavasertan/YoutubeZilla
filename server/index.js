@@ -32,12 +32,12 @@ app.use('/api/info', async (req, res) => {
 
 // Endpoint to start download
 app.use('/api/download', async (req, res) => {
-    const { url, formatId, mode, audioFormat } = req.body;
+    const { url, formatId, mode, audioFormat, container } = req.body;
     if (!url) {
         return res.status(400).json({ error: 'URL is required' });
     }
     try {
-        const result = await downloadVideo(url, formatId, mode, audioFormat);
+        const result = await downloadVideo(url, formatId, mode, audioFormat, container);
         res.json({ success: true, path: result });
     } catch (error) {
         console.error('Download error:', error);

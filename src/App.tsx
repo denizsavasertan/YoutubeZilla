@@ -38,7 +38,7 @@ function App() {
   };
 
   return (
-    <div className="min-h-screen bg-[#030114] flex flex-col items-center font-sans selection:bg-purple-500/30 overflow-hidden">
+    <div className="min-h-screen bg-[#030114] flex flex-col items-center font-sans selection:bg-purple-500/30 overflow-y-auto overflow-x-hidden">
       {/* Draggable Title Bar */}
       <div className="w-full h-8 bg-[#030114] fixed top-0 left-0 z-50 flex items-center justify-end px-4 draggable-region">
         {/* Window controls are handled by OS in frameless mode, but we need drag area */}
@@ -69,8 +69,8 @@ function App() {
         )}
       </div>
 
-      <div className="mt-auto py-6 text-gray-600 text-sm">
-        Running locally on port 3001
+      <div className="mt-auto py-6 text-gray-600 text-sm hover:text-purple-400 transition-colors cursor-pointer" onClick={() => window.open('https://www.savasertan.com', '_blank')}>
+        www.savasertan.com
       </div>
     </div>
   );

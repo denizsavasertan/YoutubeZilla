@@ -6,18 +6,20 @@ import { execFile } from 'child_process';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 
-let __dirname_custom;
+// Safe directory detection for both ESM and CJS
+let effectiveDirname;
 try {
-    if (import.meta && import.meta.url) {
+    if (typeof __dirname !== 'undefined') {
+        effectiveDirname = __dirname;
+    } else if (import.meta && import.meta.url) {
         const __filename = fileURLToPath(import.meta.url);
-        __dirname_custom = dirname(__filename);
+        effectiveDirname = dirname(__filename);
+    } else {
+        effectiveDirname = '';
     }
 } catch (e) {
-    // ignore
+    effectiveDirname = '';
 }
-
-// Fallback or use global __dirname if available (in CJS)
-const effectiveDirname = __dirname_custom || (typeof __dirname !== 'undefined' ? __dirname : '');
 
 
 // Determine download directory based on environment
@@ -40,14 +42,21 @@ if (!fs.existsSync(DOWNLOAD_DIR)) {
 // Configure yt-dlp binary path
 const getYtDlpBinary = () => {
     if (isElectron) {
-        // In production, binary is in resources/bin/yt-dlp.exe
-        // process.resourcesPath points to the resources directory
         return path.join(process.resourcesPath, 'bin', 'yt-dlp.exe');
     }
     return undefined; // Let yt-dlp-exec find it in node_modules in dev
 };
 
+// Configure ffmpeg binary path
+const getFfmpegBinary = () => {
+    if (isElectron) {
+        return path.join(process.resourcesPath, 'bin', 'ffmpeg.exe');
+    }
+    return undefined; // Let yt-dlp find it in PATH or node_modules
+};
+
 const binaryPath = getYtDlpBinary();
+const ffmpegPath = getFfmpegBinary();
 
 const logFile = path.join(os.homedir(), 'youtubezilla-debug.log');
 const log = (message) => {
@@ -63,6 +72,8 @@ log(`Starting YoutubeZilla downloader...`);
 log(`isElectron: ${isElectron}`);
 log(`process.resourcesPath: ${process.resourcesPath}`);
 log(`Calculated binaryPath: ${binaryPath}`);
+log(`Calculated ffmpegPath: ${ffmpegPath}`);
+
 if (binaryPath) {
     try {
         log(`Binary exists: ${fs.existsSync(binaryPath)}`);
@@ -75,6 +86,12 @@ const runYtDlp = (url, flags) => {
     log(`runYtDlp called for URL: ${url}`);
     if (binaryPath) {
         const args = [url];
+
+        // Explicitly set ffmpeg location if available
+        if (ffmpegPath && fs.existsSync(ffmpegPath)) {
+            args.push('--ffmpeg-location', ffmpegPath);
+        }
+
         for (const [key, value] of Object.entries(flags)) {
             if (value === true) {
                 args.push(`--${key.replace(/[A-Z]/g, m => '-' + m.toLowerCase())}`);
@@ -132,6 +149,7 @@ const getInfo = async (url) => {
                 filesize: f.filesize,
                 vcodec: f.vcodec,
                 acodec: f.acodec,
+                container: f.container,
             })).filter(f => f.vcodec !== 'none' || f.acodec !== 'none')
         };
     } catch (error) {
@@ -140,17 +158,22 @@ const getInfo = async (url) => {
     }
 };
 
-const downloadVideo = async (url, formatId, mode = 'video', audioFormat = 'mp3') => {
+const downloadVideo = async (url, formatId, mode = 'video', audioFormat = 'mp3', container = 'mp4') => {
     try {
         const options = {
             output: path.join(DOWNLOAD_DIR, '%(title)s.%(ext)s'),
+            restrictFilenames: true, // Prevent special characters in filenames
+            forceOverwrites: true,   // Overwrite existing files
         };
 
         if (mode === 'audio') {
             options.extractAudio = true;
             options.audioFormat = audioFormat;
         } else {
+            // For video, we want the best quality (often 4K/VP9) but merged into the requested container
+            // 'bestvideo+bestaudio/best' gets the highest quality streams.
             options.format = formatId || 'bestvideo+bestaudio/best';
+            options.mergeOutputFormat = container;
         }
 
         const output = await runYtDlp(url, options);

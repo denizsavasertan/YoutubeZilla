@@ -2,7 +2,7 @@ const { app, BrowserWindow, Tray, Menu, nativeImage, shell } = require('electron
 const path = require('path');
 const isDev = !app.isPackaged;
 
-console.log("ELECTRON MAIN PROCESS: v1.1.1 STARTED");
+console.log("ELECTRON MAIN PROCESS: v1.1.11 STARTED");
 
 // Start the Express server
 if (isDev) {
@@ -19,15 +19,35 @@ if (isDev) {
     const os = require('os');
     const logFile = path.join(os.homedir(), 'youtubezilla-main.log');
 
-    try {
-        require(path.join(__dirname, '../dist-server/index.cjs'));
-    } catch (e) {
+    // Helper to log to file
+    const logToFile = (msg) => {
         try {
-            fs.appendFileSync(logFile, `[${new Date().toISOString()}] Failed to start server: ${e.stack || e}\n`);
-        } catch (fsErr) {
-            // ignore
-        }
-        console.error("Failed to start server:", e);
+            fs.appendFileSync(logFile, `[${new Date().toISOString()}] ${msg}\n`);
+        } catch (e) { }
+    };
+
+    // Redirect console output to log file
+    const originalConsoleLog = console.log;
+    const originalConsoleError = console.error;
+    console.log = (...args) => {
+        logToFile(`INFO: ${args.join(' ')}`);
+        originalConsoleLog(...args);
+    };
+    console.error = (...args) => {
+        logToFile(`ERROR: ${args.join(' ')}`);
+        originalConsoleError(...args);
+    };
+
+    process.on('uncaughtException', (err) => {
+        logToFile(`UNCAUGHT EXCEPTION: ${err.stack || err}`);
+    });
+
+    try {
+        logToFile("Starting server bundle...");
+        require(path.join(__dirname, '../dist-server/index.cjs'));
+        logToFile("Server bundle required successfully.");
+    } catch (e) {
+        logToFile(`Failed to require server bundle: ${e.stack || e}`);
     }
 }
 
@@ -37,9 +57,10 @@ let tray;
 function createWindow() {
     mainWindow = new BrowserWindow({
         width: 1200,
-        height: 800,
+        height: 1000,
         minWidth: 800,
         minHeight: 600,
+        resizable: true,
         webPreferences: {
             nodeIntegration: true,
             contextIsolation: false, // For simple MVP
@@ -52,7 +73,8 @@ function createWindow() {
             height: 30
         },
         backgroundColor: '#020617',
-        show: false // Don't show until ready
+        show: false, // Don't show until ready
+        icon: path.join(__dirname, 'icon.png')
     });
 
     // Load the app
@@ -96,7 +118,7 @@ function createWindow() {
 function createTray() {
     // We need an icon. For now, we'll generate a simple one or use a placeholder.
     // Ideally we load 'icon.ico'
-    const iconPath = path.join(__dirname, '../public/vite.svg'); // Temporary icon
+    const iconPath = path.join(__dirname, 'icon.png');
     const icon = nativeImage.createFromPath(iconPath);
     tray = new Tray(icon);
 

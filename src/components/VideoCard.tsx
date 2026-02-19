@@ -25,6 +25,8 @@ const VideoCard: React.FC<VideoCardProps> = ({ info, url }) => {
     const [status, setStatus] = useState<'idle' | 'success' | 'error'>('idle');
     const [mode, setMode] = useState<'video' | 'audio'>('video');
     const [audioFormat, setAudioFormat] = useState<'mp3' | 'wav'>('mp3');
+    const [container, setContainer] = useState('mp4');
+    const [selectedFormat, setSelectedFormat] = useState('');
 
     const handleDownload = async () => {
         setDownloading(true);
@@ -32,9 +34,10 @@ const VideoCard: React.FC<VideoCardProps> = ({ info, url }) => {
         try {
             await axios.post('http://localhost:3001/api/download', {
                 url,
+                formatId: selectedFormat,
                 mode,
                 audioFormat,
-                // Default to best
+                container
             });
             setStatus('success');
             // In a real app we would track progress here
@@ -82,7 +85,36 @@ const VideoCard: React.FC<VideoCardProps> = ({ info, url }) => {
                             </button>
                         </div>
 
-                        {mode === 'audio' && (
+                        {mode === 'video' ? (
+                            <div className="flex gap-4 mb-4">
+                                <div className="flex-1">
+                                    <label className="block text-xs text-gray-500 mb-1">Max Quality</label>
+                                    <select
+                                        className="w-full bg-gray-800 text-white border border-gray-700 rounded px-3 py-2 text-sm focus:outline-none focus:border-purple-500"
+                                        value={selectedFormat}
+                                        onChange={(e) => setSelectedFormat(e.target.value)}
+                                    >
+                                        <option value="">Best Available (4K/8K)</option>
+                                        {info.formats.map((f: any) => (
+                                            <option key={f.id} value={f.id}>
+                                                {f.resolution} - {f.ext}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div className="w-32">
+                                    <label className="block text-xs text-gray-500 mb-1">Container</label>
+                                    <select
+                                        className="w-full bg-gray-800 text-white border border-gray-700 rounded px-3 py-2 text-sm focus:outline-none focus:border-purple-500"
+                                        value={container}
+                                        onChange={(e) => setContainer(e.target.value)}
+                                    >
+                                        <option value="mp4">MP4</option>
+                                        <option value="mkv">MKV</option>
+                                    </select>
+                                </div>
+                            </div>
+                        ) : (
                             <div className="flex gap-2 mb-4">
                                 <button
                                     onClick={() => setAudioFormat('mp3')}
@@ -129,7 +161,7 @@ const VideoCard: React.FC<VideoCardProps> = ({ info, url }) => {
                             ) : (
                                 <>
                                     <Download className="w-5 h-5" />
-                                    {mode === 'video' ? 'Download High Res' : `Download ${audioFormat.toUpperCase()}`}
+                                    {mode === 'video' ? 'Download Video' : `Download ${audioFormat.toUpperCase()}`}
                                 </>
                             )}
                         </button>
@@ -140,15 +172,8 @@ const VideoCard: React.FC<VideoCardProps> = ({ info, url }) => {
                                 </p>
                                 <button
                                     onClick={() => {
-                                        // We don't have the exact path here unless we store it in state, 
-                                        // but we can request to open the downloads folder generally.
-                                        // Or better, let's store the path from the response.
-                                        // For now, let's just trigger a reveal of the download folder if we don't have specific file path support in frontend state yet.
-                                        // Actually, let's just open the download folder.
-
-                                        // Wait, the user wants to "open the downloaded location".
                                         axios.post('http://localhost:3001/api/reveal', {
-                                            path: 'downloads' // Server needs generic 'downloads' handling or we pass specific path
+                                            path: 'downloads'
                                         });
                                     }}
                                     className="w-full py-2 px-4 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg text-sm font-medium transition-colors border border-gray-700"
